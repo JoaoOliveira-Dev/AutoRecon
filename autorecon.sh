@@ -48,39 +48,40 @@ banner(){
 
 # Verifica se o domínio foi fornecido
 if [ -z "$1" ]; then
-  erro "Uso: $0 dominio.com"
+  erro "Uso: $0 dominio.com [diretorio_de_saida]"
 fi
 
 DOMINIO=$1
+OUTPUT_DIR=${2:-"output_$DOMINIO"}
+
+# Cria diretório de saída se não existir
+mkdir -p "$OUTPUT_DIR"
 
 banner
 
 echo -e "${GREEN}Iniciando automação de Recon para: ${YELLOW}$DOMINIO${RESET}"
+echo -e "${GREEN}Diretório de saída: ${YELLOW}$OUTPUT_DIR${RESET}"
 echo -e "$SEPARATOR"
 
 status "Executando subfinder completo"
-subfinder -d "$DOMINIO" -all -recursive > subdomain.txt
+subfinder -d "$DOMINIO" -all -recursive > "$OUTPUT_DIR/subdomain.txt"
 
 status "Verificando subdomínios vivos com httpx"
-cat subdomain.txt | httpx -ports 80,443,8080,8000,8888,8443 -threads 200 > subdomains_alive.txt
+cat "$OUTPUT_DIR/subdomain.txt" | httpx -ports 80,443,8080,8000,8888,8443 -threads 200 > "$OUTPUT_DIR/subdomains_alive.txt"
 
 status "Raspando URLs com katana"
-katana -u subdomains_alive.txt -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o allurls.txt
+katana -u "$OUTPUT_DIR/subdomains_alive.txt" -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o "$OUTPUT_DIR/allurls.txt"
 
 status "Filtrando arquivos sensíveis"
-cat allurls.txt | grep -E "\.txt|\.log|\.cache|\.secret|\.db|\.backup|\.yml|\.json|\.gz|\.rar|\.zip|\.config" > sensitive_files.txt
-echo -e "${GREEN}[✔] Arquivos sensíveis salvos em sensitive_files.txt${RESET}"
+cat "$OUTPUT_DIR/allurls.txt" | grep -E "\.txt|\.log|\.cache|\.secret|\.db|\.backup|\.yml|\.json|\.gz|\.rar|\.zip|\.config" > "$OUTPUT_DIR/sensitive_files.txt"
+echo -e "${GREEN}[✔] Arquivos sensíveis salvos em $OUTPUT_DIR/sensitive_files.txt${RESET}"
 
 status "Coletando arquivos JavaScript"
-cat allurls.txt | grep -E "\.js$" > js.txt
-echo -e "${GREEN}[✔] Arquivos JavaScript salvos em js.txt${RESET}"
+cat "$OUTPUT_DIR/allurls.txt" | grep -E "\.js$" > "$OUTPUT_DIR/js.txt"
+echo -e "${GREEN}[✔] Arquivos JavaScript salvos em $OUTPUT_DIR/js.txt${RESET}"
 
 echo -e "$SEPARATOR"
 echo -e "${GREEN}[✔] Finalizado com sucesso!${RESET}"
-echo -e "${BLUE}Arquivos gerados:${RESET}"
-echo -e "  ${YELLOW}- subdomain.txt${RESET}"
-echo -e "  ${YELLOW}- subdomains_alive.txt${RESET}"
-echo -e "  ${YELLOW}- allurls.txt${RESET}"
-echo -e "  ${YELLOW}- sensitive_files.txt${RESET}"
-echo -e "  ${YELLOW}- js.txt${RESET}"
+echo -e "${BLUE}Arquivos gerados em: ${YELLOW}$OUTPUT_DIR${RESET}"
+ls -1 "$OUTPUT_DIR" | sed "s/^/  - /"
 echo -e "$SEPARATOR"
