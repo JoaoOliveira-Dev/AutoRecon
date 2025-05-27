@@ -39,3 +39,4 @@ Instale facilmente via [ProjectDiscovery](https://github.com/projectdiscovery) o
 ```bash
 git clone https://github.com/JoaoOliveira-Dev/AutoRecon.git
 cd AutoRecon
+chmod +x autorecon.sh
