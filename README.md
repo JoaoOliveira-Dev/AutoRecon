@@ -37,5 +37,5 @@ Instale facilmente via [ProjectDiscovery](https://github.com/projectdiscovery) o
 1. Clone o repositório:
 
 ```bash
-git clone https://github.com/seuusuario/recon-automation.git
-cd recon-automation
+git clone https://github.com/JoaoOliveira-Dev/AutoRecon.git
+cd AutoRecon
