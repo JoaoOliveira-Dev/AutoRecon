@@ -67,7 +67,7 @@ status "Executando subfinder completo"
 subfinder -d "$DOMINIO" -all -recursive > "$OUTPUT_DIR/subdomain.txt"
 
 status "Verificando subdomínios vivos com httpx"
-cat "$OUTPUT_DIR/subdomain.txt" | httpx -ports 80,443,8080,8000,8888,8443,4445,4848 -threads 200 > "$OUTPUT_DIR/subdomains_alive.txt"
+cat "$OUTPUT_DIR/subdomain.txt" | httpx -ports 80,443,8080,8000,8888,8443,4445,4848,5500  -threads 200 > "$OUTPUT_DIR/subdomains_alive.txt"
 
 status "Raspando URLs com katana"
 katana -u "$OUTPUT_DIR/subdomains_alive.txt" -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o "$OUTPUT_DIR/allurls.txt"
