@@ -23,10 +23,19 @@ erro(){
   exit 1
 }
 
+# Função de ajuda/uso
+usage(){
+  echo -e "${YELLOW}Uso: $0 dominio.com [-s | --subs] [diretorio_de_saida]${RESET}"
+  echo -e "  dominio.com          O domínio alvo para o recon."
+  echo -e "  -s, --subs           (Opcional) Executa o subfinder para enumerar subdomínios."
+  echo -e "  diretorio_de_saida   (Opcional) O nome do diretório para salvar os resultados."
+  exit 1
+}
+
 # Banner
 banner(){
   echo -e "${BLUE}
- █████╗ ██╗   ██╗████████╗ ██████╗
+  █████╗ ██╗   ██╗████████╗ ██████╗
 ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗
 ███████║██║   ██║   ██║   ██║   ██║
 ██╔══██║██║   ██║   ██║   ██║   ██║
@@ -39,16 +48,46 @@ banner(){
 ██╔══██╗██╔══╝  ██║     ██║   ██║██║╚██╗██║
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝
-                                           ${RESET}"
+                                          ${RESET}"
 
-  echo -e "${YELLOW}           Automated Recon Script v1.0${RESET}"
-  echo -e "${BLUE}          by JoaoOliveira - github.com/JoaoOliveira-Dev${RESET}"
+  echo -e "${YELLOW}           Automated Recon Script v1.1${RESET}"
+  echo -e "${BLUE}         by JoaoOliveira - github.com/JoaoOliveira-Dev${RESET}"
   echo -e "$SEPARATOR"
 }
 
+# --- LÓGICA DE ARGUMENTOS ---
+if [ "$#" -eq 0 ]; then
+    usage
+fi
+
+RUN_SUBFINDER=false
+PARAMS=()
+
+# Itera sobre todos os argumentos
+while (( "$#" )); do
+  case "$1" in
+    -s|--subs)
+      RUN_SUBFINDER=true
+      shift # Remove a flag da lista
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      # Adiciona o argumento restante (domínio ou diretório) a uma nova lista
+      PARAMS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Restaura os argumentos posicionais (sem as flags -s ou --subs)
+set -- "${PARAMS[@]}"
+
 # Verifica se o domínio foi fornecido
 if [ -z "$1" ]; then
-  erro "Uso: $0 dominio.com [diretorio_de_saida]"
+  erro "O domínio não foi especificado."
+  usage
 fi
 
 DOMINIO=$1
@@ -61,16 +100,34 @@ banner
 
 echo -e "${GREEN}Iniciando automação de Recon para: ${YELLOW}$DOMINIO${RESET}"
 echo -e "${GREEN}Diretório de saída: ${YELLOW}$OUTPUT_DIR${RESET}"
+if [ "$RUN_SUBFINDER" = true ]; then
+    echo -e "${GREEN}Enumeração de subdomínios: ${YELLOW}Ativada${RESET}"
+else
+    echo -e "${GREEN}Enumeração de subdomínios: ${YELLOW}Desativada${RESET}"
+fi
 echo -e "$SEPARATOR"
 
-status "Executando subfinder completo"
-subfinder -d "$DOMINIO" -all -recursive > "$OUTPUT_DIR/subdomain.txt"
 
-status "Verificando subdomínios vivos com httpx"
-cat "$OUTPUT_DIR/subdomain.txt" | httpx -ports 80,443,8080,8000,8888,8443,4445,4848,5500  -threads 200 > "$OUTPUT_DIR/subdomains_alive.txt"
+# --- EXECUÇÃO DAS FERRAMENTAS ---
+
+# Executa o subfinder e httpx APENAS se a flag foi passada
+if [ "$RUN_SUBFINDER" = true ]; then
+  status "Executando subfinder completo"
+  subfinder -d "$DOMINIO" -all -recursive > "$OUTPUT_DIR/subdomain.txt"
+
+  status "Verificando subdomínios vivos com httpx"
+  cat "$OUTPUT_DIR/subdomain.txt" | httpx -ports 80,443,8080,8000,8888,8443,4445,4848,5500 -threads 200 > "$OUTPUT_DIR/subdomains_alive.txt"
+fi
 
 status "Raspando URLs com katana"
-katana -u "$OUTPUT_DIR/subdomains_alive.txt" -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o "$OUTPUT_DIR/allurls.txt"
+# Se a lista de subdomínios vivos existir, use-a. Senão, use o domínio principal.
+if [ -f "$OUTPUT_DIR/subdomains_alive.txt" ]; then
+  echo -e "${CYAN}[INFO] Usando a lista de subdomínios vivos como entrada para o Katana.${RESET}"
+  katana -u "$OUTPUT_DIR/subdomains_alive.txt" -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o "$OUTPUT_DIR/allurls.txt"
+else
+  echo -e "${CYAN}[INFO] Usando o domínio principal '$DOMINIO' como entrada para o Katana.${RESET}"
+  katana -u "https://$DOMINIO" -d 5 -kf -jc -fx -ef woff,css,png,svg,jpg,woff2,jpeg,gif,svg -o "$OUTPUT_DIR/allurls.txt"
+fi
 
 status "Filtrando arquivos sensíveis"
 cat "$OUTPUT_DIR/allurls.txt" | grep -E "\.txt|\.log|\.cache|\.secret|\.db|\.backup|\.yml|\.json|\.gz|\.rar|\.zip|\.config" > "$OUTPUT_DIR/sensitive_files.txt"
